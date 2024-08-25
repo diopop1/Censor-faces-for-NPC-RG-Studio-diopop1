@@ -3,7 +3,7 @@
     "Development": [ "RG Studio", "diopop1", "ChatGPT" ],
 
     "Description": "This addon is a modification of the original add-on Censored Faces of the Players from RG Studio. In this version, the method of handling censorship was changed, allowing it to be adapted for use on the faces of non-player characters (NPCs).",
-    "Version": "1.0",
+    "Version": "1.1",
     "Dependencies": "None",
     "License": "This addon is a modification of Censored Faces of the Players, created by RG Studio. The licensing details of the original addon are unknown to us. The modifications made to this addon are licensed under the GNU General Public License v3.0.",
     "Copyright": "© RG Studio | diopop1 - 2024",
