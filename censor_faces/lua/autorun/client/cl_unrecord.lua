@@ -1,13 +1,12 @@
--- censor_faces\lua\autorun\client\cl_unrecord.lua
-
 if CLIENT then
-    -- Создаем клиентские переменные для управления эффектом
+    -- Создаем клиентские переменные для управления эффектами
     local censor_enabled = CreateClientConVar("pp_censor_faces", "0", true, false)
     local censor_size = CreateClientConVar("pp_censor_faces_size", "64", true, false)
+    local censor_effect = CreateClientConVar("pp_censor_faces_effect", "mosaic", true, false)
+    local censor_regdoll_blur = CreateClientConVar("pp_censor_regdoll_blur", "0", true, false)
 
-    -- Регистрируем эффект в меню постобработки
     list.Set("PostProcess", "Censor Faces", {
-        icon = "materials/gui/postprocess/censor_faces.jpg", -- Убедитесь, что иконка доступна по этому пути
+        icon = "materials/gui/postprocess/censor_faces.jpg",
         convar = "pp_censor_faces",
         category = "#shaders_pp",
         cpanel = function(CPanel)
@@ -19,8 +18,9 @@ if CLIENT then
             }
 
             params.Options["#preset.default"] = {
-                pp_censor_faces_size = "64"
-            }   
+                pp_censor_faces_size = "64",
+                pp_censor_faces_effect = "mosaic"
+            }
 
             params.CVars = table.GetKeys(params.Options["#preset.default"])
             CPanel:AddControl("ComboBox", params)
@@ -30,6 +30,19 @@ if CLIENT then
                 Command = "pp_censor_faces" 
             })
 
+            CPanel:AddControl("ComboBox", {
+                Label = "Censor Effect",
+                Command = "pp_censor_faces_effect",
+                Options = {
+                    ["Mosaic"] = { pp_censor_faces_effect = "mosaic" },
+                    ["Black Square"] = { pp_censor_faces_effect = "square" }
+                }
+            })
+
+            CPanel:AddControl("CheckBox", { 
+                Label = "Apply Blur to Ragdolls", 
+                Command = "pp_censor_regdoll_blur" 
+            })
         end
     })
 
@@ -39,17 +52,19 @@ if CLIENT then
         ["$basetexture"] = tex:GetName()
     })
 
-    -- Хук для постобработки
+    local blurMaterial = Material("pp/blurscreen")
+
     hook.Add("RenderScreenspaceEffects", "Unrecord_CensorFaces_PostProcess", function()
         if not censor_enabled:GetBool() then return end
 
-        -- Используем постобработку для размывания лиц НПС
-        for _, entity in ipairs(ents.GetAll()) do
-            if entity:IsNPC() then
-                -- Устанавливаем флаг рендеринга
-                local rendering = true
+        local effect_type = censor_effect:GetString()
+        local apply_blur_to_regdolls = censor_regdoll_blur:GetBool()
 
-                -- Убедитесь, что голова НПС установлена
+        for _, entity in ipairs(ents.GetAll()) do
+            local is_npc = entity:IsNPC()
+            local is_regdoll = entity:IsRagdoll()
+
+            if is_npc or (is_regdoll and apply_blur_to_regdolls) then
                 if not entity.unrec_head_set then
                     local numHitBoxSets = entity:GetHitboxSetCount()
                     local set, bone = 0, 0
@@ -66,13 +81,10 @@ if CLIENT then
                     entity.unrec_head_set, entity.unrec_head_bone = set, bone
                 end
 
-                -- Проверьте, что переменные не равны nil
                 if entity.unrec_head_set and entity.unrec_head_bone then
-                    -- Копируем текущее изображение в текстуру
                     render.CopyRenderTargetToTexture(tex)
 
                     cam.Start2D()
-                        -- Проверяем, существует ли компонент "eyes"
                         local attachment = entity:LookupAttachment("eyes")
                         if attachment == 0 then
                             cam.End2D()
@@ -91,9 +103,10 @@ if CLIENT then
                             continue
                         end
 
+                        -- Трассировка для проверки, что нет объектов между камерой и головой
                         local tr = util.TraceLine({
                             start = LocalPlayer():EyePos(),
-                            endpos = entity:EyePos(),
+                            endpos = pos,
                             filter = function(ent) return ent ~= entity and ent ~= LocalPlayer() end
                         })
                         if tr.Hit then
@@ -105,7 +118,6 @@ if CLIENT then
                             continue
                         end
 
-                        -- Проверяем, есть ли у НПС правильные хитбоксы
                         local mins, maxs = entity:GetHitBoxBounds(entity.unrec_head_bone, entity.unrec_head_set)
                         if not mins or not maxs then
                             cam.End2D()
@@ -127,7 +139,11 @@ if CLIENT then
                         local xdiff, ydiff = math.abs(maxxy.x - minxy.x), math.abs(maxxy.y - minxy.y)
                         local size = math.max(xdiff, ydiff) * 1 / entity:EyePos():Distance(LocalPlayer():EyePos()) * ScrH() / 8
 
-                        render.SetStencilWriteMask(0xFF)
+                        -- Применение эффекта
+                        if effect_type == "square" then
+                            draw.RoundedBox(0, data2D.x - size, data2D.y - size, size * 2, size * 2, Color(0, 0, 0))
+                        elseif effect_type == "mosaic" then
+                            render.SetStencilWriteMask(0xFF)
                             render.SetStencilTestMask(0xFF)
                             render.SetStencilReferenceValue(1)
                             render.SetStencilPassOperation(STENCIL_KEEP)
@@ -135,21 +151,19 @@ if CLIENT then
                             render.ClearStencil()
                             render.SetStencilCompareFunction(STENCIL_NEVER)
                             render.SetStencilFailOperation(STENCIL_REPLACE)
-                        render.SetStencilEnable(true)
-                            draw.RoundedBox(0, data2D.x - size, data2D.y - size, size * 2, size * 2, Color(0, 0, 0))
-                            render.SetStencilCompareFunction(STENCIL_EQUAL)
-                            render.SetStencilFailOperation(STENCIL_REPLACE)
-                            render.PushFilterMin(1)
-                            render.PushFilterMag(1)
-                            render.DrawTextureToScreen(tex)
-                            render.PopFilterMin()
-                            render.PopFilterMag()
-                        render.SetStencilEnable(false)
+                            render.SetStencilEnable(true)
+                                draw.RoundedBox(0, data2D.x - size, data2D.y - size, size * 2, size * 2, Color(0, 0, 0))
+                                render.SetStencilCompareFunction(STENCIL_EQUAL)
+                                render.SetStencilFailOperation(STENCIL_REPLACE)
+                                render.PushFilterMin(1)
+                                render.PushFilterMag(1)
+                                render.DrawTextureToScreen(tex)
+                                render.PopFilterMin()
+                                render.PopFilterMag()
+                            render.SetStencilEnable(false)
+                        end
                     cam.End2D()
                 end
-
-                -- Сбрасываем флаг рендеринга
-                rendering = false
             end
         end
     end)
