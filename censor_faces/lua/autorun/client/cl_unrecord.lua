@@ -1,9 +1,13 @@
+-- censor_faces_for_npc_rg_studio_diopop1\lua\autorun\client\cl_unrecord.lua
+
 if CLIENT then
     -- Создаем клиентские переменные для управления эффектами
     local censor_enabled = CreateClientConVar("pp_censor_faces", "0", true, false)
     local censor_size = CreateClientConVar("pp_censor_faces_size", "64", true, false)
     local censor_effect = CreateClientConVar("pp_censor_faces_effect", "mosaic", true, false)
     local censor_regdoll_blur = CreateClientConVar("pp_censor_regdoll_blur", "0", true, false)
+    local blur_enabled = CreateClientConVar("pp_blur_enabled", "0", true, false)  -- Включение/выключение ползунка
+    local blur_size_convar = CreateClientConVar("pp_censor_faces_blur_size", "5", true, false)  -- Значение по умолчанию для размера
 
     list.Set("PostProcess", "Censor Faces", {
         icon = "materials/gui/postprocess/censor_faces.jpg",
@@ -35,7 +39,8 @@ if CLIENT then
                 Command = "pp_censor_faces_effect",
                 Options = {
                     ["Mosaic"] = { pp_censor_faces_effect = "mosaic" },
-                    ["Black Square"] = { pp_censor_faces_effect = "square" }
+                    ["Black Square"] = { pp_censor_faces_effect = "square" },
+                    ["White Square"] = { pp_censor_faces_effect = "white Square" }
                 }
             })
 
@@ -43,6 +48,24 @@ if CLIENT then
                 Label = "Apply Blur to Ragdolls", 
                 Command = "pp_censor_regdoll_blur" 
             })
+            
+             -- Кнопка для включения/отключения ползунка
+            CPanel:AddControl("CheckBox", { 
+                Label = "Enable Blur Size Slider", 
+                Command = "pp_blur_enabled" 
+            })
+
+            -- Ползунок для размера блюра
+            CPanel:AddControl("Slider", {
+                Label = "Blur Size",
+                Command = "pp_censor_faces_blur_size",
+                Type = "Float",
+                Min = "0",
+                Max = "10",
+                Description = "Adjust the size of the blur effect."
+            })
+
+           
         end
     })
 
@@ -59,6 +82,12 @@ if CLIENT then
 
         local effect_type = censor_effect:GetString()
         local apply_blur_to_regdolls = censor_regdoll_blur:GetBool()
+        local blur_slider_enabled = blur_enabled:GetBool()
+        local blur_size = blur_slider_enabled and blur_size_convar:GetFloat() or 1.15  -- Используем значение по умолчанию если ползунок выключен
+
+        -- Отладочный вывод
+        print("Blur Enabled: " .. tostring(blur_slider_enabled))
+        print("Blur Size: " .. blur_size)
 
         for _, entity in ipairs(ents.GetAll()) do
             local is_npc = entity:IsNPC()
@@ -137,7 +166,7 @@ if CLIENT then
                         minxy.x = math.min(maxs_toscreen.x, mins_toscreen.x)
                         minxy.y = math.min(mins_toscreen.y, maxs_toscreen.y)
                         local xdiff, ydiff = math.abs(maxxy.x - minxy.x), math.abs(maxxy.y - minxy.y)
-                        local size = math.max(xdiff, ydiff) * 1 / entity:EyePos():Distance(LocalPlayer():EyePos()) * ScrH() / 8
+                        local size = math.max(xdiff, ydiff) * 1 / entity:EyePos():Distance(LocalPlayer():EyePos()) * (ScrH() / 8) * blur_size
 
                         -- Применение эффекта
                         if effect_type == "square" then
@@ -161,6 +190,8 @@ if CLIENT then
                                 render.PopFilterMin()
                                 render.PopFilterMag()
                             render.SetStencilEnable(false)
+                        elseif effect_type == "white Square" then
+                         draw.RoundedBox(0, data2D.x - size, data2D.y - size, size * 2, size * 2, Color(255, 255, 255))
                         end
                     cam.End2D()
                 end
