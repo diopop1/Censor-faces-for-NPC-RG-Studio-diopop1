@@ -1,13 +1,12 @@
--- censor_faces_for_npc_rg_studio_diopop1\lua\autorun\client\cl_unrecord.lua
-
+-- Censor Faces for NPCs and Ragdolls with Glitch Effect
 if CLIENT then
     -- Создаем клиентские переменные для управления эффектами
     local censor_enabled = CreateClientConVar("pp_censor_faces", "0", true, false)
     local censor_size = CreateClientConVar("pp_censor_faces_size", "64", true, false)
     local censor_effect = CreateClientConVar("pp_censor_faces_effect", "mosaic", true, false)
     local censor_regdoll_blur = CreateClientConVar("pp_censor_regdoll_blur", "0", true, false)
-    local blur_enabled = CreateClientConVar("pp_blur_enabled", "0", true, false)  -- Включение/выключение ползунка
-    local blur_size_convar = CreateClientConVar("pp_censor_faces_blur_size", "5", true, false)  -- Значение по умолчанию для размера
+    local blur_enabled = CreateClientConVar("pp_blur_enabled", "0", true, false)
+    local blur_size_convar = CreateClientConVar("pp_censor_faces_blur_size", "5", true, false)
 
     list.Set("PostProcess", "Censor Faces", {
         icon = "materials/gui/postprocess/censor_faces.jpg",
@@ -40,7 +39,8 @@ if CLIENT then
                 Options = {
                     ["Mosaic"] = { pp_censor_faces_effect = "mosaic" },
                     ["Black Square"] = { pp_censor_faces_effect = "square" },
-                    ["White Square"] = { pp_censor_faces_effect = "white Square" }
+                    ["White Square"] = { pp_censor_faces_effect = "white Square" },
+                    ["Glitch"] = { pp_censor_faces_effect = "glitch" }  -- Новый эффект глитча
                 }
             })
 
@@ -49,7 +49,7 @@ if CLIENT then
                 Command = "pp_censor_regdoll_blur" 
             })
             
-             -- Кнопка для включения/отключения ползунка
+            -- Кнопка для включения/отключения ползунка
             CPanel:AddControl("CheckBox", { 
                 Label = "Enable Blur Size Slider", 
                 Command = "pp_blur_enabled" 
@@ -64,8 +64,6 @@ if CLIENT then
                 Max = "10",
                 Description = "Adjust the size of the blur effect."
             })
-
-           
         end
     })
 
@@ -83,7 +81,7 @@ if CLIENT then
         local effect_type = censor_effect:GetString()
         local apply_blur_to_regdolls = censor_regdoll_blur:GetBool()
         local blur_slider_enabled = blur_enabled:GetBool()
-        local blur_size = blur_slider_enabled and blur_size_convar:GetFloat() or 1.15  -- Используем значение по умолчанию если ползунок выключен
+        local blur_size = blur_slider_enabled and blur_size_convar:GetFloat() or 1.15
 
         -- Отладочный вывод
         print("Blur Enabled: " .. tostring(blur_slider_enabled))
@@ -191,7 +189,40 @@ if CLIENT then
                                 render.PopFilterMag()
                             render.SetStencilEnable(false)
                         elseif effect_type == "white Square" then
-                         draw.RoundedBox(0, data2D.x - size, data2D.y - size, size * 2, size * 2, Color(255, 255, 255))
+                            draw.RoundedBox(0, data2D.x - size, data2D.y - size, size * 2, size * 2, Color(255, 255, 255))
+                          elseif effect_type == "glitch" then
+                            local glitch_size = size * 0.8
+                            local glitch_count = math.ceil(85)
+
+                            -- Основной глитч эффект
+                            for i = 1, glitch_count do
+                                local offsetX = math.random(-glitch_size, glitch_size)
+                                local offsetY = math.random(-glitch_size, glitch_size)
+                                local glitch_rect_width = math.random(size * 0.2, size * 0.5)
+                                local glitch_rect_height = math.random(size * 0.2, size * 0.5)
+
+                                 -- Генерация случайного цвета и альфа-канала
+                                local random_color = Color(math.random(0, 255), math.random(0, 255), math.random(0, 255), math.random(0, 255))
+                                
+                                draw.RoundedBox(0, data2D.x + offsetX, data2D.y + offsetY, glitch_rect_width, glitch_rect_height, random_color)
+                            end
+
+                            -- Добавление дергания
+                            local current_time = CurTime()
+                            local time_factor = (current_time % 1)
+                            local offset_factor = math.sin(time_factor * 2 * math.pi) * glitch_size * 0.05
+
+                            -- Применение искажений
+                            for i = 1, glitch_count do
+                                local offsetX = math.random(-glitch_size, glitch_size) + offset_factor
+                                local offsetY = math.random(-glitch_size, glitch_size) + offset_factor
+                                local glitch_rect_width = math.random(size * 0.2, size * 0.5)
+                                local glitch_rect_height = math.random(size * 0.2, size * 0.5)
+                                 -- Генерация случайного цвета и альфа-канала
+                                local random_color = Color(math.random(0, 255), math.random(0, 255), math.random(0, 255), math.random(50, 150))
+                                
+                                draw.RoundedBox(0, data2D.x + offsetX, data2D.y + offsetY, glitch_rect_width, glitch_rect_height, random_color)
+                            end
                         end
                     cam.End2D()
                 end
