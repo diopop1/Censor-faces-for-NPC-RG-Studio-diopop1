@@ -7,6 +7,7 @@ if CLIENT then
     local censor_regdoll_blur = CreateClientConVar("pp_censor_regdoll_blur", "0", true, false)
     local blur_enabled = CreateClientConVar("pp_blur_enabled", "0", true, false)
     local blur_size_convar = CreateClientConVar("pp_censor_faces_blur_size", "5", true, false)
+    local filter_enemy_npcs = CreateClientConVar("pp_censor_faces_enemy_npcs", "0", true, false)
 
     list.Set("PostProcess", "Censor Faces", {
         icon = "materials/gui/postprocess/censor_faces.jpg",
@@ -33,6 +34,7 @@ if CLIENT then
                 Command = "pp_censor_faces" 
             })
 
+
             CPanel:AddControl("ComboBox", {
                 Label = "Censor Effect",
                 Command = "pp_censor_faces_effect",
@@ -40,7 +42,7 @@ if CLIENT then
                     ["Mosaic"] = { pp_censor_faces_effect = "mosaic" },
                     ["Black Square"] = { pp_censor_faces_effect = "square" },
                     ["White Square"] = { pp_censor_faces_effect = "white Square" },
-                    ["Glitch"] = { pp_censor_faces_effect = "glitch" }  -- Новый эффект глитча
+                    ["Glitch"] = { pp_censor_faces_effect = "glitch" }
                 }
             })
 
@@ -64,6 +66,18 @@ if CLIENT then
                 Max = "10",
                 Description = "Adjust the size of the blur effect."
             })
+
+            -- Фильтр по врагам
+            CPanel:AddControl("CheckBox", { 
+                Label = "Filter Enemy NPCs Only", 
+                Command = "pp_censor_faces_enemy_npcs" 
+    
+            })
+
+            CPanel:AddControl("Label", {
+              Text = "This addon is a modification of the original add-on Censored Faces of the Players from RG Studio. In this version, the method of handling censorship was changed, allowing it to be adapted for use on the faces of non-player characters (NPCs). Version 1.4A"
+            })
+
         end
     })
 
@@ -75,6 +89,25 @@ if CLIENT then
 
     local blurMaterial = Material("pp/blurscreen")
 
+    -- Список классов врагов
+    local enemy_classes = {
+        "npc_combine_s", "npc_combine_camera", "npc_combinegunship",
+        "npc_metropolice", "npc_zombie", "npc_fastzombie",
+        "npc_poisonzombie", "npc_antlion", "npc_antlion_worker",
+        "npc_antlionguard", "npc_strider", "npc_turret_floor", "npc_turret_ceiling",
+        "npc_turret_ground", "npc_manhack", "npc_rollermine"
+    }
+
+    local function isEnemyNPC(npc)
+        local class = npc:GetClass()
+        for _, enemy_class in ipairs(enemy_classes) do
+            if class == enemy_class then
+                return true
+            end
+        end
+        return false
+    end
+
     hook.Add("RenderScreenspaceEffects", "Unrecord_CensorFaces_PostProcess", function()
         if not censor_enabled:GetBool() then return end
 
@@ -82,14 +115,22 @@ if CLIENT then
         local apply_blur_to_regdolls = censor_regdoll_blur:GetBool()
         local blur_slider_enabled = blur_enabled:GetBool()
         local blur_size = blur_slider_enabled and blur_size_convar:GetFloat() or 1.15
+        local filter_enemy_npcs = filter_enemy_npcs:GetBool()
 
         -- Отладочный вывод
         print("Blur Enabled: " .. tostring(blur_slider_enabled))
         print("Blur Size: " .. blur_size)
+        print("Filter Enemy NPCs: " .. tostring(filter_enemy_npcs))
 
         for _, entity in ipairs(ents.GetAll()) do
             local is_npc = entity:IsNPC()
             local is_regdoll = entity:IsRagdoll()
+
+            if filter_enemy_npcs and is_npc then
+                if not isEnemyNPC(entity) then
+                    is_npc = false
+                end
+            end
 
             if is_npc or (is_regdoll and apply_blur_to_regdolls) then
                 if not entity.unrec_head_set then
@@ -190,7 +231,7 @@ if CLIENT then
                             render.SetStencilEnable(false)
                         elseif effect_type == "white Square" then
                             draw.RoundedBox(0, data2D.x - size, data2D.y - size, size * 2, size * 2, Color(255, 255, 255))
-                          elseif effect_type == "glitch" then
+                        elseif effect_type == "glitch" then
                             local glitch_size = size * 0.8
                             local glitch_count = math.ceil(85)
 
@@ -201,7 +242,7 @@ if CLIENT then
                                 local glitch_rect_width = math.random(size * 0.2, size * 0.5)
                                 local glitch_rect_height = math.random(size * 0.2, size * 0.5)
 
-                                 -- Генерация случайного цвета и альфа-канала
+                                -- Генерация случайного цвета и альфа-канала
                                 local random_color = Color(math.random(0, 255), math.random(0, 255), math.random(0, 255), math.random(0, 255))
                                 
                                 draw.RoundedBox(0, data2D.x + offsetX, data2D.y + offsetY, glitch_rect_width, glitch_rect_height, random_color)
@@ -218,7 +259,7 @@ if CLIENT then
                                 local offsetY = math.random(-glitch_size, glitch_size) + offset_factor
                                 local glitch_rect_width = math.random(size * 0.2, size * 0.5)
                                 local glitch_rect_height = math.random(size * 0.2, size * 0.5)
-                                 -- Генерация случайного цвета и альфа-канала
+                                -- Генерация случайного цвета и альфа-канала
                                 local random_color = Color(math.random(0, 255), math.random(0, 255), math.random(0, 255), math.random(50, 150))
                                 
                                 draw.RoundedBox(0, data2D.x + offsetX, data2D.y + offsetY, glitch_rect_width, glitch_rect_height, random_color)
