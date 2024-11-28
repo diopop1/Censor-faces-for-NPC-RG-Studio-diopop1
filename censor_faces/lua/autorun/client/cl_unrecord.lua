@@ -75,7 +75,7 @@ if CLIENT then
             })
 
             CPanel:AddControl("Label", {
-              Text = "This addon is a modification of the original add-on Censored Faces of the Players from RG Studio. In this version, the method of handling censorship was changed, allowing it to be adapted for use on the faces of non-player characters (NPCs). Version 1.4A"
+              Text = "This addon is a modification of the original add-on Censored Faces of the Players from RG Studio. In this version, the method of handling censorship was changed, allowing it to be adapted for use on the faces of non-player characters (NPCs). Version 1.4B"
             })
 
         end
@@ -116,11 +116,6 @@ if CLIENT then
         local blur_slider_enabled = blur_enabled:GetBool()
         local blur_size = blur_slider_enabled and blur_size_convar:GetFloat() or 1.15
         local filter_enemy_npcs = filter_enemy_npcs:GetBool()
-
-        -- Отладочный вывод
-        print("Blur Enabled: " .. tostring(blur_slider_enabled))
-        print("Blur Size: " .. blur_size)
-        print("Filter Enemy NPCs: " .. tostring(filter_enemy_npcs))
 
         for _, entity in ipairs(ents.GetAll()) do
             local is_npc = entity:IsNPC()
